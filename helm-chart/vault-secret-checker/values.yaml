@@ -1,11 +1,11 @@
-# Default values for valut-secret-checker.
+# Default values for vault-secret-checker.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
 
 image:
-  repository: "ghcr.io/sn0rt/valut-secret-checker"
+  repository: "ghcr.io/sn0rt/vault-secret-checker"
   pullPolicy: IfNotPresent
   tag: "v0.0.5"
 
@@ -14,13 +14,11 @@ nameOverride: ""
 fullnameOverride: ""
 
 # Pod Security Context
-podSecurityContext:
-  {}
+podSecurityContext: {}
   # fsGroup: 2000
 
 # Security Context
-securityContext:
-  {}
+securityContext: {}
   # capabilities:
   #   drop:
   #   - ALL

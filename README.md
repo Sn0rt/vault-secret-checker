@@ -1,6 +1,6 @@
 # Vault Secret Checker
 
-🌐 **Live Demo**: [https://valut-secret-checker.vercel.app/](https://valut-secret-checker.vercel.app/)
+🌐 **Live Demo**: [https://vault-secret-checker.vercel.app/](https://vault-secret-checker.vercel.app/)
 
 In production environments, Vault secret IDs require periodic updates, but developers cannot access production systems directly. This tool enables quick validation that new Secret Keys can correctly replace existing ones without requiring direct production access. All production changes must go through change management systems.
 
@@ -93,7 +93,7 @@ docker run -p 3000:3000 \
 ### Kubernetes with Helm
 
 ```bash
-helm install vault-secret-checker ./helm-chart/valut-secret-checker \
+helm install vault-secret-checker ./helm-chart/vault-secret-checker \
   --set config.vaultEndpoints="http://vault:8200" \
   --set config.appTitle="My Vault Checker"
 ```

@@ -35,6 +35,9 @@ ENV NODE_ENV production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 RUN apk add --no-cache ca-certificates curl
+RUN apk update && \
+      apk upgrade --no-cache && \
+      apk add --no-cache --upgrade busybox openssl
 
 COPY --from=builder /app/public ./public
 
