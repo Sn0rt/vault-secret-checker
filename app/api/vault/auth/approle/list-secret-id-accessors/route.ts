@@ -2,7 +2,8 @@ import { Method } from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError, serverWarn } from '@/lib/server-logger';
-import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
+import { lookupVaultToken } from '@/lib/vault-auth';
+import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 interface ListSecretIdAccessorsRequest {
   endpoint?: string;
@@ -60,7 +61,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vault endpoint is required.' }, { status: 400 });
     }
 
-    const vaultUrl = normalizeVaultEndpoint(vaultAddress);
+    let vaultUrl: string;
+    try {
+      vaultUrl = requireAllowedVaultEndpoint(vaultAddress);
+    } catch {
+      return NextResponse.json({ error: 'Vault endpoint is not allowed.' }, { status: 400 });
+    }
+
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
     serverDebug('[list-secret-id-accessors] Looking up AppRole metadata.', { lookupUrl });
 
@@ -102,7 +109,7 @@ export async function POST(req: NextRequest) {
       const responseData = axiosError.response.data as { errors?: unknown };
       const isPermissionDenied =
         Array.isArray(responseData?.errors) &&
-        responseData.errors.some((item) => typeof item === 'string' && item.toLowerCase().includes('permission denied'));
+        responseData.errors.some((item: unknown) => typeof item === 'string' && item.toLowerCase().includes('permission denied'));
 
       if (axiosError.response.status === 403 && isPermissionDenied && requestStage === 'lookup-role') {
         message = 'The current Vault token cannot look up its own metadata. Grant access to auth/token/lookup-self.';

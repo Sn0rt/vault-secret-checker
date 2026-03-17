@@ -5,7 +5,12 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import JsonView from '@uiw/react-json-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getVaultEndpoints, getAppTitle, type ConfigResponse } from '@/lib/vault-config';
+import {
+  getVaultEndpoints,
+  getAppTitle,
+  normalizeConfiguredVaultEndpoint,
+  type ConfigResponse,
+} from '@/lib/vault-config';
 import { EndpointList } from '@/components/EndpointList';
 import { AuthenticationMethod } from '@/components/AuthenticationMethod';
 import { PermissionValidation } from '@/components/PermissionValidation';
@@ -55,6 +60,18 @@ function useLocalStorage(key: string, initialValue: string) {
   return [storedValue, setValue] as const;
 }
 
+function getAllowedEndpoint(
+  candidate: string,
+  allowedEndpoints: string[]
+): string {
+  const normalizedCandidate = candidate ? normalizeConfiguredVaultEndpoint(candidate) : '';
+  if (normalizedCandidate && allowedEndpoints.includes(normalizedCandidate)) {
+    return normalizedCandidate;
+  }
+
+  return allowedEndpoints[0] || '';
+}
+
 export default function Home() {
   // Get default title (will be overridden by config API)
   const defaultAppTitle = getAppTitle();
@@ -62,7 +79,7 @@ export default function Home() {
 
   // Get endpoints from environment variable
   const vaultEndpoints = getVaultEndpoints();
-  const defaultEndpoint = vaultEndpoints[0];
+  const defaultEndpoint = vaultEndpoints[0] || '';
 
   const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
   const [availableNamespaces, setAvailableNamespaces] = useState<string[]>(['default']);
@@ -89,8 +106,9 @@ export default function Home() {
 
   // Initialize endpoint state
   useEffect(() => {
-    setEndpoint(storedEndpoint || defaultEndpoint);
-  }, [storedEndpoint, defaultEndpoint]);
+    const nextEndpoint = getAllowedEndpoint(storedEndpoint || defaultEndpoint, availableEndpoints);
+    setEndpoint(nextEndpoint);
+  }, [storedEndpoint, defaultEndpoint, availableEndpoints]);
 
   const [loading, setLoading] = useState<{
     login?: boolean;
@@ -107,36 +125,43 @@ export default function Home() {
     notificationEmail: ''
   });
 
-  // Load application config (title, endpoints, and namespaces) from server
+  // Load application config (title, endpoints, and namespaces) from server once
   useEffect(() => {
+    let isMounted = true;
+
     const loadConfig = async () => {
       try {
         const response = await axios.get<ConfigResponse>('/api/config');
-        if (response.data.success && response.data.config) {
-          setAppTitle(response.data.config.title);
-          setAvailableEndpoints(response.data.config.endpoints);
-          setAvailableNamespaces(response.data.config.namespaces);
-          setEmailConfigured(response.data.config.email?.configured || false);
-          
-          // Update default endpoint to use the first endpoint from backend
-          // Only if no endpoint was previously stored in localStorage
-          if (response.data.config.endpoints.length > 0 && !storedEndpoint) {
-            const backendDefaultEndpoint = response.data.config.endpoints[0];
-            setStoredEndpoint(backendDefaultEndpoint);
-            setEndpoint(backendDefaultEndpoint);
-            setCredentials(prev => ({
-              ...prev,
-              endpoint: backendDefaultEndpoint
-            }));
-          }
+        if (!isMounted || !response.data.success || !response.data.config) {
+          return;
         }
+
+        setAppTitle(response.data.config.title);
+        const normalizedEndpoints = response.data.config.endpoints.map(normalizeConfiguredVaultEndpoint);
+        setAvailableEndpoints(normalizedEndpoints);
+        setAvailableNamespaces(response.data.config.namespaces);
+        setEmailConfigured(response.data.config.email?.configured || false);
       } catch (error) {
         console.warn('Failed to load config from server, using defaults:', error);
       }
     };
+
     loadConfig();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const nextEndpoint = getAllowedEndpoint(storedEndpoint || endpoint || defaultEndpoint, availableEndpoints);
+    if (nextEndpoint !== endpoint) {
+      setEndpoint(nextEndpoint);
+    }
+    if (nextEndpoint !== storedEndpoint) {
+      setStoredEndpoint(nextEndpoint);
+    }
+  }, [availableEndpoints, defaultEndpoint, endpoint, setStoredEndpoint, storedEndpoint]);
 
   // Sync credentials with localStorage values when they change
   useEffect(() => {
@@ -153,8 +178,9 @@ export default function Home() {
   }, [endpoint, storedAccessId, storedSecretPath, storedK8sNamespace, storedK8sSecretName, storedSecretKey]);
 
   const handleEndpointChange = (value: string) => {
-    setEndpoint(value);
-    setStoredEndpoint(value);
+    const nextEndpoint = getAllowedEndpoint(value, availableEndpoints);
+    setEndpoint(nextEndpoint);
+    setStoredEndpoint(nextEndpoint);
   };
 
   const showJsonToast = (title: string, data: unknown, isSuccess: boolean = true) => {

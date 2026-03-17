@@ -34,9 +34,9 @@ export function EndpointList({
             options={availableEndpoints}
             value={currentEndpoint}
             onValueChange={onEndpointChange}
-            placeholder="Select or enter vault endpoint..."
-            emptyText="No endpoints found. Type to add custom endpoint."
-            allowCustom={true}
+            placeholder="Select a Vault endpoint..."
+            emptyText="No Vault endpoints configured."
+            allowCustom={false}
             className="w-80"
           />
         </div>
