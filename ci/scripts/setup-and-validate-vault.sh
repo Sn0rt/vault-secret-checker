@@ -172,7 +172,11 @@ path "auth/token/lookup-self" {
 }
 
 path "auth/approle/role/eso-role/secret-id" {
-  capabilities = ["update"]
+  capabilities = ["list", "update"]
+}
+
+path "auth/approle/role/*/secret-id" {
+  capabilities = ["list", "update"]
 }
 EOF
 echo "INFO: ESO policy ready"

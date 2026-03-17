@@ -45,12 +45,35 @@ export function LoginTab({
   const [email, setEmail] = useState('');
   const [genLoading, setGenLoading] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
+  const [accessorsDialogOpen, setAccessorsDialogOpen] = useState(false);
+  const [accessorsLoading, setAccessorsLoading] = useState(false);
+  const [accessorsResult, setAccessorsResult] = useState<string | null>(null);
+  const [accessors, setAccessors] = useState<string[]>([]);
+  const [accessorsRoleName, setAccessorsRoleName] = useState<string | null>(null);
 
   const isGenerateError =
     genResult?.startsWith('Failed to send') ||
     genResult?.startsWith('Request failed') ||
     genResult?.startsWith('Unable to send') ||
     false;
+
+  const exportAccessors = () => {
+    const rows = [
+      ['app_role', 'role_id', 'accessor'],
+      ...accessors.map((accessor) => [accessorsRoleName || '', credentials.accessId || '', accessor]),
+    ];
+    const csv = rows
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${accessorsRoleName || 'approle'}-secret-id-accessors.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -255,6 +278,134 @@ export function LoginTab({
                     className="bg-slate-900 text-white hover:bg-slate-800"
                   >
                     {genLoading ? 'Sending...' : 'Send Secret ID'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {token && (
+            <Dialog open={accessorsDialogOpen} onOpenChange={setAccessorsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="min-w-[152px] border-slate-300 text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => {
+                    setAccessorsResult(null);
+                    setAccessors([]);
+                    setAccessorsRoleName(null);
+                  }}
+                >
+                  List Secret IDs
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader className="pr-10">
+                  <DialogTitle>Secret ID Accessors</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-slate-600">
+                        List all Secret ID accessors for the current AppRole.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                      onClick={exportAccessors}
+                      disabled={accessors.length === 0}
+                    >
+                      Export
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">AppRole</div>
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                        {accessorsRoleName || 'Not loaded yet'}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Role ID</div>
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-700">
+                        {credentials.accessId || 'Not provided'}
+                      </div>
+                    </div>
+                  </div>
+                  {accessorsResult && (
+                    <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                      {accessorsResult}
+                    </div>
+                  )}
+                  {!accessorsResult && accessors.length > 0 && (
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-sm font-medium text-slate-700">Secret ID Accessors</div>
+                        <div className="text-xs text-slate-500">{accessors.length} total</div>
+                      </div>
+                      <div className="max-h-72 overflow-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead className="sticky top-0 bg-white">
+                            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                              <th className="w-16 px-4 py-3 font-medium">#</th>
+                              <th className="px-4 py-3 font-medium">Accessor</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {accessors.map((accessor, index) => (
+                              <tr key={accessor} className="border-b border-slate-100 last:border-b-0">
+                                <td className="px-4 py-3 align-top text-slate-500">{index + 1}</td>
+                                <td className="px-4 py-3 font-mono text-slate-700">{accessor}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  {!accessorsResult && !accessorsLoading && accessors.length === 0 && (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                      No accessors loaded yet.
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={async () => {
+                      setAccessorsLoading(true);
+                      setAccessorsResult(null);
+                      setAccessors([]);
+                      setAccessorsRoleName(null);
+                      try {
+                        const res = await fetch('/api/vault/auth/approle/list-secret-id-accessors', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'x-vault-token': token } : {})
+                          },
+                          body: JSON.stringify({ endpoint: credentials.endpoint })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setAccessors(Array.isArray(data.accessors) ? data.accessors : []);
+                          setAccessorsRoleName(data.roleName || null);
+                        } else {
+                          setAccessorsResult(data.error || 'Unknown error');
+                        }
+                      } catch (error: unknown) {
+                        const message = error instanceof Error ? error.message : 'Unknown error';
+                        setAccessorsResult(`Request failed: ${message}`);
+                      } finally {
+                        setAccessorsLoading(false);
+                      }
+                    }}
+                    disabled={accessorsLoading}
+                    className="bg-slate-900 text-white hover:bg-slate-800"
+                  >
+                    {accessorsLoading ? 'Loading...' : 'Load Accessors'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
