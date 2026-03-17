@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError } from '@/lib/server-logger';
+import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -27,32 +27,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    const vaultUrl = normalizeVaultEndpoint(endpoint);
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
 
     serverDebug(`[LOOKUP-${requestId}] Making Vault lookup request to: ${lookupUrl}`);
 
-    const response = await axiosInstance.get(lookupUrl, {
-      timeout: 10000,
-      headers: {
-        'X-Vault-Token': token,
-        'Content-Type': 'application/json'
-      }
-    });
+    const result = await lookupVaultToken(vaultUrl, token);
 
-    serverDebug(`[LOOKUP-${requestId}] Vault lookup successful, response status: ${response.status}`);
+    serverDebug(`[LOOKUP-${requestId}] Vault lookup successful.`);
     serverDebug(`[LOOKUP-${requestId}] Token info:`, {
-      id: response.data.data?.id ? `${response.data.data.id.substring(0, 8)}...` : undefined,
-      ttl: response.data.data?.ttl,
-      renewable: response.data.data?.renewable,
-      policies: response.data.data?.policies,
-      entityId: response.data.data?.entity_id ? `${response.data.data.entity_id.substring(0, 8)}...` : undefined
+      id: result.data?.id ? `${result.data.id.substring(0, 8)}...` : undefined,
+      ttl: result.data?.ttl,
+      renewable: result.data?.renewable,
+      policies: result.data?.policies,
+      entityId: result.data?.entity_id ? `${result.data.entity_id.substring(0, 8)}...` : undefined
     });
 
     const duration = Date.now() - startTime;
     serverDebug(`[LOOKUP-${requestId}] Request completed successfully in ${duration}ms`);
 
-    return NextResponse.json(response.data);
+    return NextResponse.json(result);
 
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
