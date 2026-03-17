@@ -8,12 +8,14 @@ interface EndpointListProps {
   availableEndpoints: string[];
   currentEndpoint: string;
   onEndpointChange: (endpoint: string) => void;
+  emailConfigured?: boolean;
 }
 
 export function EndpointList({
   availableEndpoints,
   currentEndpoint,
-  onEndpointChange
+  onEndpointChange,
+  emailConfigured = false
 }: EndpointListProps) {
   return (
     <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -25,7 +27,7 @@ export function EndpointList({
           Endpoint Configuration
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <Label htmlFor="endpoint-select" className="min-w-[100px]">Endpoint</Label>
           <Combobox
@@ -37,6 +39,16 @@ export function EndpointList({
             allowCustom={true}
             className="w-80"
           />
+        </div>
+        <div className="flex justify-start">
+          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
+            emailConfigured
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-700'
+          }`}>
+            <div className={`h-2 w-2 rounded-full ${emailConfigured ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+            SMTP {emailConfigured ? 'Configured' : 'Not Configured'}
+          </div>
         </div>
       </CardContent>
     </Card>
