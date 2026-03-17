@@ -187,9 +187,10 @@ Store it securely and rotate any previous references if needed.`;
     if (axios.isAxiosError(error) && error.response) {
       const status = error.response.status;
       const statusText = error.response.statusText;
+      const responseData = error.response.data as { errors?: unknown };
       const isPermissionDenied =
-        Array.isArray(error.response.data?.errors) &&
-        error.response.data.errors.some((item) => typeof item === 'string' && item.toLowerCase().includes('permission denied'));
+        Array.isArray(responseData?.errors) &&
+        responseData.errors.some((item: unknown) => typeof item === 'string' && item.toLowerCase().includes('permission denied'));
 
       let message = `Vault request failed: ${status} ${statusText}`;
       if (status === 403 && isPermissionDenied && requestStage === 'lookup-role') {
