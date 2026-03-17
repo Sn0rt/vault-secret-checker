@@ -166,6 +166,14 @@ kubectl exec -i $VAULT_POD -- env VAULT_TOKEN=dev-only-token vault policy write 
 path "secret/data/dify/*" {
   capabilities = ["read"]
 }
+
+path "auth/token/lookup-self" {
+  capabilities = ["read", "update"]
+}
+
+path "auth/approle/role/eso-role/secret-id" {
+  capabilities = ["update"]
+}
 EOF
 echo "INFO: ESO policy ready"
 

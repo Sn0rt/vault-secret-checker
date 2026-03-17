@@ -23,6 +23,10 @@ interface EmailSendResult {
   details: string[];
 }
 
+declare global {
+  var __smtpVerificationPromise: Promise<void> | undefined;
+}
+
 // Helper function to safely get error code
 function getErrorCode(error: unknown): string {
   if (error && typeof error === 'object' && 'code' in error) {
@@ -85,6 +89,12 @@ function createTransporter() {
   return nodemailer.createTransport(config);
 }
 
+async function verifySmtpConnection(): Promise<void> {
+  const transporter = createTransporter();
+  serverDebug('Verifying SMTP connection...');
+  await transporter.verify();
+}
+
 // Validate email address format
 function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -102,16 +112,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     }
 
     const transporter = createTransporter();
-
-    // Test connection first
-    serverDebug('Testing SMTP connection...');
-    try {
-      await transporter.verify();
-      serverDebug('SMTP connection verified successfully');
-    } catch (verifyError) {
-      serverError('SMTP connection verification failed:', verifyError);
-      // Try to continue anyway, sometimes verify() fails but sendMail works
-    }
+    await ensureSmtpReady();
 
     const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@example.com';
 
@@ -225,13 +226,7 @@ This notification was generated automatically by the ${appTitle} system.`;
 export async function testEmailConfiguration(): Promise<boolean> {
   try {
     serverDebug('Testing email configuration...');
-
-    const transporter = createTransporter();
-
-    // First test the connection
-    serverDebug('Verifying SMTP connection...');
-    await transporter.verify();
-
+    await verifySmtpConnection();
     serverDebug('SMTP configuration is valid');
     return true;
   } catch (error) {
@@ -241,4 +236,19 @@ export async function testEmailConfiguration(): Promise<boolean> {
     });
     return false;
   }
+}
+
+export async function ensureSmtpReady(): Promise<void> {
+  if (!isSmtpConfigured()) {
+    return;
+  }
+
+  if (!globalThis.__smtpVerificationPromise) {
+    globalThis.__smtpVerificationPromise = (async () => {
+      await verifySmtpConnection();
+      serverDebug('SMTP connection verified successfully');
+    })();
+  }
+
+  await globalThis.__smtpVerificationPromise;
 }

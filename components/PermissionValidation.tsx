@@ -64,7 +64,7 @@ export function PermissionValidation({
             <Button
               onClick={onValidateAccess}
               disabled={disabled || loading.validateAccess}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="min-w-[140px] bg-slate-900 text-white hover:bg-slate-800"
             >
               {loading.validateAccess && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
               Validate Access

@@ -17,15 +17,63 @@ In production environments, Vault secret IDs require periodic updates, but devel
 ## Quick Start
 
 1. Install dependencies: `npm install`
-2. Create `.env.local`:
+2. Start a local Vault dev instance in Kubernetes:
 
-   ```env
-   VAULT_ENDPOINTS=http://localhost:8200,https://vault.example.com
-   APP_TITLE="Vault Secret Checker"
+   ```bash
+   helm repo add hashicorp https://helm.releases.hashicorp.com
+   helm repo update
+
+   helm install vault hashicorp/vault \
+     --set "server.dev.enabled=true" \
+     --set "server.dev.devRootToken=dev-only-token"
    ```
 
-3. Run development server: `npm run dev`
-4. Open `http://localhost:3000`
+3. Create AppRole test data and the `vault-credentials` Kubernetes secret:
+
+   ```bash
+   bash ci/scripts/setup-and-validate-vault.sh
+   ```
+
+4. Forward Vault to localhost:
+
+   ```bash
+   kubectl port-forward svc/vault 8200:8200
+   ```
+
+5. Start a local SMTP debug server:
+
+   ```bash
+   python3 -m smtpd -c DebuggingServer -n localhost:1025
+   ```
+
+6. Create `.env.local`:
+
+   ```env
+   VAULT_ENDPOINTS=http://localhost:8200
+   APP_TITLE="Vault Secret Checker"
+   K8S_NAMESPACES=default
+   SMTP_HOST=localhost
+   SMTP_PORT=1025
+   SMTP_FROM_EMAIL=noreply@example.com
+   ```
+
+7. Run development server: `npm run dev`
+8. Open `http://localhost:3000`
+
+### Local Dev Credentials
+
+After running `ci/scripts/setup-and-validate-vault.sh`, the Kubernetes secret `vault-credentials` contains the AppRole credentials used by the app:
+
+```bash
+kubectl get secret vault-credentials -o json | jq .data
+```
+
+Use:
+
+- `role-id` as the UI `Role ID`
+- `default` as the namespace
+- `vault-credentials` as the secret name
+- `secret-id` as the secret key
 
 ## Usage
 
