@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { serverDebug, serverError } from './server-logger';
 
 // Create a simple axios instance with basic configuration
 // Node.js will automatically handle CA certificates when NODE_EXTRA_CA_CERTS is set
@@ -9,32 +10,32 @@ const axiosInstance = axios.create({
   }
 });
 
-// Request interceptor for debugging (optional)
 axiosInstance.interceptors.request.use(
   (config) => {
-    console.log(`Making ${config.method?.toUpperCase()} request to: ${config.url}`);
+    serverDebug('Outbound HTTP request.', {
+      method: config.method?.toUpperCase(),
+      url: config.url
+    });
     return config;
   },
   (error) => {
-    console.error('Request interceptor error:', error);
+    serverError('HTTP request interceptor failed.', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for error handling (optional)
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.code === 'CERT_UNTRUSTED' || error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
-      console.error('TLS Certificate verification failed:', error.message);
-      console.error('Check your CA certificate configuration in Kubernetes');
+      serverError('TLS certificate verification failed.', {
+        code: error.code,
+        message: error.message
+      });
     }
     return Promise.reject(error);
   }
 );
 
-// Export the configured axios instance
 export { axiosInstance };
-
-// Export a default axios instance for backward compatibility
 export default axiosInstance;

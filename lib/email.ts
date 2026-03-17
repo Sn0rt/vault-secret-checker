@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { serverDebug, serverError } from './server-logger';
 
 interface EmailOptions {
-  to: string;
+  to: string | string[];
   subject: string;
   text?: string;
   html?: string;
@@ -21,16 +21,6 @@ interface EmailSendResult {
   success: number;
   failed: number;
   details: string[];
-}
-
-interface NetworkError extends Error {
-  code?: string;        // Error codes like ESOCKET, ECONNREFUSED, EDNS, etc.
-  errno?: number;       // Error number
-  syscall?: string;     // System call
-  hostname?: string;    // Hostname
-  address?: string;     // IP address  
-  port?: number;        // Port number
-  command?: string;     // SMTP command
 }
 
 // Helper function to safely get error code
@@ -104,9 +94,10 @@ function isValidEmail(email: string): boolean {
 // Send email notification
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    // Validate email address
-    if (!isValidEmail(options.to)) {
-      serverError('Invalid email address format:', options.to);
+    const recipients = Array.isArray(options.to) ? options.to : [options.to];
+
+    if (recipients.length === 0 || recipients.some((email) => !isValidEmail(email))) {
+      serverError('Invalid email address format.', { recipients });
       return false;
     }
 
@@ -126,14 +117,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     const mailOptions = {
       from: fromEmail,
-      to: options.to,
+      to: recipients,
       subject: options.subject,
       text: options.text,
       html: options.html
     };
 
     serverDebug('Sending email:', {
-      to: options.to,
+      recipientCount: recipients.length,
       subject: options.subject,
       from: fromEmail
     });
@@ -142,13 +133,13 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     serverDebug('Email sent successfully:', {
       messageId: result.messageId,
-      to: options.to
+      recipientCount: recipients.length
     });
 
     return true;
   } catch (error) {
     serverError('Failed to send email:', {
-      to: options.to,
+      recipientCount: Array.isArray(options.to) ? options.to.length : 1,
       subject: options.subject,
       error: getErrorCode(error)
     });
@@ -206,27 +197,24 @@ ${responseData}
 
 This notification was generated automatically by the ${appTitle} system.`;
 
-  // Send email to each recipient
-  for (const email of emails) {
-    try {
-      const success = await sendEmail({
-        to: email,
-        subject,
-        text: textContent
-      });
+  try {
+    const success = await sendEmail({
+      to: emails,
+      subject,
+      text: textContent
+    });
 
-      if (success) {
-        result.success++;
-        result.details.push(`Successfully sent to ${email}`);
-      } else {
-        result.failed++;
-        result.details.push(`Failed to send to ${email}`);
-      }
-    } catch (error) {
-      result.failed++;
-      result.details.push(`Error sending to ${email}: ${error}`);
-      serverError(`Failed to send email to ${email}:`, error);
+    if (success) {
+      result.success = emails.length;
+      result.details.push(`Successfully sent one email to ${emails.length} recipients`);
+    } else {
+      result.failed = emails.length;
+      result.details.push(`Failed to send email to ${emails.length} recipients`);
     }
+  } catch (error) {
+    result.failed = emails.length;
+    result.details.push(`Error sending email to ${emails.length} recipients: ${error}`);
+    serverError('Failed to send unwrap notification email.', error);
   }
 
   serverDebug('Email notification results:', result);

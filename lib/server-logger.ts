@@ -1,73 +1,77 @@
 import winston from 'winston';
 
-// 创建 Winston logger 实例 - 仅用于服务器端
+const SENSITIVE_KEY_PATTERN = /^(token|client_token|wrappedToken|wrapped_token|authorization|cookie)$/i;
+
+function redactValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        SENSITIVE_KEY_PATTERN.test(key) ? '[REDACTED]' : redactValue(nestedValue),
+      ])
+    );
+  }
+
+  return value;
+}
+
+function serializeMeta(meta: Record<string, unknown>) {
+  const sanitized = redactValue(meta);
+  if (!sanitized || typeof sanitized !== 'object' || Object.keys(sanitized).length === 0) {
+    return '';
+  }
+
+  return ` ${JSON.stringify(sanitized)}`;
+}
+
+const formatter = winston.format.printf(({ level, message, timestamp, stack, ...meta }) => {
+  const resolvedMessage = typeof message === 'string' ? message : JSON.stringify(redactValue(message));
+  const stackSuffix = stack ? `\n${stack}` : '';
+
+  return `${timestamp} [${level.toUpperCase()}] ${resolvedMessage}${serializeMeta(meta)}${stackSuffix}`;
+});
+
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.NODE_ENV === 'production'
+    ? (process.env.LOG_LEVEL || 'warn')
+    : (process.env.DEBUG === 'true' ? 'debug' : (process.env.LOG_LEVEL || 'info')),
   format: winston.format.combine(
-    winston.format.timestamp({
-      format: 'YYYY-MM-DD HH:mm:ss'
-    }),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
-    winston.format.printf(({ level, message, timestamp, ...meta }) => {
-      let logMessage = `${timestamp} [${level.toUpperCase()}]: ${message}`;
-      
-      // 如果有额外的元数据，格式化输出
-      if (Object.keys(meta).length > 0) {
-        logMessage += ` ${JSON.stringify(meta)}`;
-      }
-      
-      return logMessage;
-    })
+    formatter
   ),
   transports: [
-    // 控制台输出
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
+    new winston.transports.Console()
   ]
 });
 
-// 在生产环境中调整日志级别
-if (process.env.NODE_ENV === 'production') {
-  logger.level = 'warn';
-} else if (process.env.DEBUG === 'true') {
-  logger.level = 'debug';
+function logWithMeta(level: 'info' | 'debug' | 'warn' | 'error', message: string, args: unknown[]) {
+  if (args.length > 0) {
+    logger.log(level, message, { metadata: args });
+    return;
+  }
+
+  logger.log(level, message);
 }
 
-// 服务器端日志函数
 export function serverLog(message: string, ...args: unknown[]) {
-  if (args.length > 0) {
-    logger.info(message, { metadata: args });
-  } else {
-    logger.info(message);
-  }
+  logWithMeta('info', message, args);
 }
 
 export function serverDebug(message: string, ...args: unknown[]) {
-  if (args.length > 0) {
-    logger.debug(message, { metadata: args });
-  } else {
-    logger.debug(message);
-  }
+  logWithMeta('debug', message, args);
 }
 
 export function serverError(message: string, ...args: unknown[]) {
-  if (args.length > 0) {
-    logger.error(message, { metadata: args });
-  } else {
-    logger.error(message);
-  }
+  logWithMeta('error', message, args);
 }
 
 export function serverWarn(message: string, ...args: unknown[]) {
-  if (args.length > 0) {
-    logger.warn(message, { metadata: args });
-  } else {
-    logger.warn(message);
-  }
+  logWithMeta('warn', message, args);
 }
 
 export default logger;

@@ -5,14 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 interface AuthenticationCredentials {
   authMethod: 'approle';
   accessId: string;
+  endpoint: string;
   k8sNamespace: string;
   k8sSecretName: string;
-  secretKey: string; // Key name within the Kubernetes secret
+  secretKey: string;
 }
 
 interface LoginTabProps {
@@ -37,10 +40,19 @@ export function LoginTab({
   token
 }: LoginTabProps) {
   const [showRoleId, setShowRoleId] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [genLoading, setGenLoading] = useState(false);
+  const [genResult, setGenResult] = useState<string | null>(null);
+
+  const isGenerateError =
+    genResult?.startsWith('Failed to send') ||
+    genResult?.startsWith('Request failed') ||
+    genResult?.startsWith('Unable to send') ||
+    false;
 
   return (
     <div className="space-y-6">
-      {/* 第一行: Authentication Type - 标签左侧，下拉框最右侧 */}
       <div className="flex items-center justify-between">
         <Label htmlFor="auth-type" className="min-w-[140px]">Authentication Type</Label>
         <Select
@@ -56,7 +68,6 @@ export function LoginTab({
         </Select>
       </div>
 
-      {/* 第二行: Role ID - 标签左侧，输入框最右侧 */}
       <div className="flex items-center justify-between">
         <Label htmlFor="access-id" className="min-w-[140px]">Role ID</Label>
         <div className="relative">
@@ -138,9 +149,78 @@ export function LoginTab({
         </div>
       </div>
 
-      {/* 按钮和状态在同一水平线 */}
+      {token && (
+        <div className="flex justify-end mb-2">
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                type="button"
+                onClick={() => {
+                  setGenResult(null);
+                }}
+              >
+                Generate Secret ID
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Generate Secret ID</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <Label htmlFor="gen-email">Recipient Email</Label>
+                <Input
+                  id="gen-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={genLoading}
+                />
+                {genResult && (
+                  <div className={isGenerateError ? 'text-red-600 text-sm' : 'text-green-600 text-sm'}>{genResult}</div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={async () => {
+                    setGenLoading(true);
+                    setGenResult(null);
+                    try {
+                      const res = await fetch('/api/vault/auth/approle/generate-secret-id', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          ...(token ? { 'x-vault-token': token } : {})
+                        },
+                        body: JSON.stringify({ email, endpoint: credentials.endpoint })
+                      });
+                      if (res.ok) {
+                        setGenResult('Secret ID sent successfully.');
+                      } else {
+                        const data = await res.json();
+                        setGenResult('Failed to send: ' + (data.error || 'Unknown error'));
+                      }
+                    } catch (error: unknown) {
+                      const message = error instanceof Error ? error.message : 'Unknown error';
+                      setGenResult('Request failed: ' + message);
+                    } finally {
+                      setGenLoading(false);
+                    }
+                  }}
+                  disabled={genLoading || !email}
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  {genLoading ? 'Sending...' : 'Send Secret ID'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+
       <div className="flex justify-between items-center pt-4">
-        {/* 左侧: Token状态 */}
         <div className="flex items-center gap-2">
           {token ? (
             <>
@@ -154,8 +234,7 @@ export function LoginTab({
             </>
           )}
         </div>
-        
-        {/* 右侧: 按钮组 */}
+
         <div className="flex gap-2">
           <Button
             onClick={onLogin}

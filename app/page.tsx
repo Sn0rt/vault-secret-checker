@@ -9,6 +9,7 @@ import { getVaultEndpoints, getAppTitle, type ConfigResponse } from '@/lib/vault
 import { EndpointList } from '@/components/EndpointList';
 import { AuthenticationMethod } from '@/components/AuthenticationMethod';
 import { PermissionValidation } from '@/components/PermissionValidation';
+import { WrappingTab } from '@/components/WrappingTab';
 
 interface VaultCredentials {
   endpoint: string;
@@ -405,32 +406,36 @@ export default function Home() {
               {/* Step 2: Authentication Method */}
               <AuthenticationMethod
                 credentials={{
+                  endpoint: credentials.endpoint,
                   authMethod: credentials.authMethod,
                   accessId: credentials.accessId,
                   k8sNamespace: credentials.k8sNamespace,
                   k8sSecretName: credentials.k8sSecretName,
                   secretKey: credentials.secretKey
                 }}
-                unwrapCredentials={unwrapCredentials}
                 availableNamespaces={availableNamespaces}
                 onCredentialChange={handleInputChange}
-                onUnwrapCredentialChange={handleUnwrapCredentialChange}
                 onLogin={testLogin}
                 onLookup={testLookup}
                 onLogout={testLogout}
-                onUnwrap={testUnwrap}
                 loading={loading}
                 token={token}
-                emailConfigured={emailConfigured}
               />
 
-              {/* Step 3: Permission Validation */}
               <PermissionValidation
                 secretPath={credentials.secretPath}
                 onSecretPathChange={(path) => handleInputChange('secretPath', path)}
                 onValidateAccess={testValidateAccess}
                 loading={loading}
                 disabled={!token}
+              />
+
+              <WrappingTab
+                credentials={unwrapCredentials}
+                onCredentialChange={handleUnwrapCredentialChange}
+                onUnwrap={testUnwrap}
+                loading={loading}
+                emailConfigured={emailConfigured}
               />
             </CardContent>
           </Card>
