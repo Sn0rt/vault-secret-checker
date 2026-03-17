@@ -11,6 +11,20 @@ interface GenerateSecretIdRequest {
   roleId?: string;
 }
 
+const DEFAULT_GENERATE_SECRET_ID_PATH = '/v1/auth/approle/role/{approle}/secret-id';
+
+function buildGenerateSecretIdUrl(vaultUrl: string, roleName: string) {
+  const overridePath = process.env.VAULT_V1_GENERATE_SECRET_ID?.trim();
+  const configuredPath = overridePath || DEFAULT_GENERATE_SECRET_ID_PATH;
+  const resolvedPath = configuredPath.replace('{approle}', encodeURIComponent(roleName));
+
+  return {
+    overridePath: overridePath || null,
+    configuredPath,
+    secretIdUrl: `${vaultUrl}${resolvedPath}`,
+  };
+}
+
 function resolveRoleName(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -49,6 +63,8 @@ function resolveRoleName(payload: unknown): string | null {
 export async function POST(req: NextRequest) {
   let requestStage: 'lookup-role' | 'generate-secret-id' = 'lookup-role';
   let resolvedRoleName: string | null = null;
+  let activeGenerateSecretIdPath: string | null = null;
+  let activeGenerateSecretIdUrl: string | null = null;
 
   try {
     const { email, endpoint, roleId }: GenerateSecretIdRequest = await req.json();
@@ -84,8 +100,16 @@ export async function POST(req: NextRequest) {
     }
 
     requestStage = 'generate-secret-id';
-    const secretIdUrl = `${vaultUrl}/v1/auth/approle/role/${encodeURIComponent(roleName)}/secret-id`;
-    serverDebug('[generate-secret-id] Creating Secret ID.', { secretIdUrl, roleName });
+    const { overridePath, configuredPath, secretIdUrl } = buildGenerateSecretIdUrl(vaultUrl, roleName);
+    activeGenerateSecretIdPath = configuredPath;
+    activeGenerateSecretIdUrl = secretIdUrl;
+    serverDebug('[generate-secret-id] Creating Secret ID.', {
+      overridePath,
+      configuredPath,
+      usingOverride: !!overridePath,
+      secretIdUrl,
+      roleName,
+    });
 
     const secretIdResponse = await axiosInstance.post(
       secretIdUrl,
@@ -171,7 +195,9 @@ Store it securely and rotate any previous references if needed.`;
       if (status === 403 && isPermissionDenied && requestStage === 'lookup-role') {
         message = 'The current Vault token cannot look up its own metadata. Grant access to auth/token/lookup-self or skip role lookup.';
       } else if (status === 403 && isPermissionDenied && requestStage === 'generate-secret-id') {
-        message = `The current Vault token is not allowed to generate a Secret ID for AppRole '${resolvedRoleName || 'unknown'}'. Grant access to auth/approle/role/${resolvedRoleName || '<role-name>'}/secret-id.`;
+        message = activeGenerateSecretIdPath && activeGenerateSecretIdPath !== DEFAULT_GENERATE_SECRET_ID_PATH
+          ? `The current Vault token is not allowed to generate a Secret ID for AppRole '${resolvedRoleName || 'unknown'}' using the configured override path '${activeGenerateSecretIdPath}'.`
+          : `The current Vault token is not allowed to generate a Secret ID for AppRole '${resolvedRoleName || 'unknown'}'. Grant access to auth/approle/role/${resolvedRoleName || '<role-name>'}/secret-id.`;
       }
 
       serverError('[generate-secret-id] Vault request failed.', {
@@ -179,6 +205,7 @@ Store it securely and rotate any previous references if needed.`;
         statusText,
         stage: requestStage,
         roleName: resolvedRoleName,
+        secretIdUrl: activeGenerateSecretIdUrl,
         data: error.response.data
       });
 
@@ -186,6 +213,7 @@ Store it securely and rotate any previous references if needed.`;
         error: message,
         stage: requestStage,
         roleName: resolvedRoleName,
+        secretIdUrl: activeGenerateSecretIdUrl,
         details: error.response.data
       }, { status });
     }

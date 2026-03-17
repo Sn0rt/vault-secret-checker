@@ -52,9 +52,11 @@ In production environments, Vault secret IDs require periodic updates, but devel
    VAULT_ENDPOINTS=http://localhost:8200
    APP_TITLE="Vault Secret Checker"
    K8S_NAMESPACES=default
+   VAULT_V1_GENERATE_SECRET_ID=
    SMTP_HOST=localhost
    SMTP_PORT=1025
    SMTP_FROM_EMAIL=noreply@example.com
+   SMTP_ADMIN_CC_WITH=
    ```
 
 7. Run development server: `npm run dev`
@@ -96,6 +98,8 @@ Use:
 - `VAULT_ENDPOINTS`: Comma-separated Vault endpoints
 - `APP_TITLE`: Application title
 - `K8S_NAMESPACES`: Available Kubernetes namespaces
+- `VAULT_V1_GENERATE_SECRET_ID`: Optional path template override for Secret ID generation. Leave empty to use Vault native `/v1/auth/approle/role/{approle}/secret-id`; set it to something like `/v1/orchestrator/generate-secret-id/{approle}` to override.
+- `SMTP_ADMIN_CC_WITH`: Optional comma/space separated email list that will always be added as CC on outgoing emails
 - `EMAIL_*`: Email configuration
 
 ### Kubernetes Secret Example

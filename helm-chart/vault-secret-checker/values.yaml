@@ -69,6 +69,10 @@ env:
   # Kubernetes namespaces allowed for secret access (comma-separated list)
   # This controls both UI dropdown options and RBAC permissions
   K8S_NAMESPACE_LIST: "default,vault-system"
+  # Optional Secret ID generation path template override. Supports {approle}.
+  # Leave empty to use the Vault native path, or override it to something like
+  # /v1/orchestrator/generate-secret-id/{approle}.
+  VAULT_V1_GENERATE_SECRET_ID: ""
   # Debug mode (optional)
   DEBUG: "false"
 
@@ -85,6 +89,8 @@ env:
   SMTP_SECURE: "false"
   # From email address for notifications
   SMTP_FROM_EMAIL: "noreply@example.com"
+  # Optional comma or space separated admin CC recipients for all outgoing mail
+  SMTP_ADMIN_CC_WITH: ""
 
 # TLS Configuration
 tls:
