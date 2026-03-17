@@ -401,6 +401,7 @@ export default function Home() {
                 availableEndpoints={availableEndpoints}
                 currentEndpoint={endpoint}
                 onEndpointChange={handleEndpointChange}
+                emailConfigured={emailConfigured}
               />
 
               {/* Step 2: Authentication Method */}

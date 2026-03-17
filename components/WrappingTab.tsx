@@ -41,10 +41,10 @@ export function WrappingTab({
         >
           <div className="space-y-1">
             <CardTitle className="text-lg font-semibold text-slate-700">
-              Secret ID Unwrap
+              Wrapped Token Tools
             </CardTitle>
             <p className="text-sm text-slate-500">
-              Small utility for unwrapping a wrapped Secret ID token when needed.
+              Use this utility to unwrap a Vault wrapped token and optionally notify recipients.
             </p>
           </div>
           {expanded ? (
@@ -79,17 +79,10 @@ export function WrappingTab({
           />
 
           <div className="flex justify-between items-center pt-4">
-            <div className="flex items-center">
-              <div className={`w-2 h-2 rounded-full mr-1 ${emailConfigured ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className={`text-xs ${emailConfigured ? 'text-green-600' : 'text-red-600'}`}>
-                SMTP {emailConfigured ? 'Configured' : 'Not Configured'}
-              </span>
-            </div>
-
             <Button
               onClick={onUnwrap}
               disabled={loading.unwrap || !credentials.wrappedToken}
-              className="min-w-[120px] bg-slate-900 text-white hover:bg-slate-800"
+              className="ml-auto min-w-[120px] bg-slate-900 text-white hover:bg-slate-800"
             >
               {loading.unwrap && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
               Unwrap
