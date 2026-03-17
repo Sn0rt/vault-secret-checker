@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { EmailRecipientsField } from '@/components/EmailRecipientsField';
 
 interface UnwrapCredentials {
   wrappedToken: string;
@@ -69,21 +69,14 @@ export function WrappingTab({
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <Label htmlFor="notification-email" className="min-w-[140px]">
-              Notification CC (Email)
-              <span className="text-xs text-gray-500 ml-1">(optional)</span>
-            </Label>
-            <Input
-              id="notification-email"
-              type="email"
-              placeholder="user1@example.com, user2@example.com"
-              value={credentials.notificationEmail || ''}
-              onChange={(e) => onCredentialChange('notificationEmail', e.target.value)}
-              className="w-80"
-              disabled={!emailConfigured}
-            />
-          </div>
+          <EmailRecipientsField
+            id="notification-email"
+            label="Notification CC"
+            value={credentials.notificationEmail || ''}
+            onChange={(value) => onCredentialChange('notificationEmail', value)}
+            disabled={!emailConfigured}
+            optional={true}
+          />
 
           <div className="flex justify-between items-center pt-4">
             <div className="flex items-center">
@@ -96,7 +89,7 @@ export function WrappingTab({
             <Button
               onClick={onUnwrap}
               disabled={loading.unwrap || !credentials.wrappedToken}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="min-w-[120px] bg-slate-900 text-white hover:bg-slate-800"
             >
               {loading.unwrap && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
               Unwrap

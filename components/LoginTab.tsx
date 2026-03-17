@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EmailRecipientsField } from '@/components/EmailRecipientsField';
 
 import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -89,13 +90,13 @@ export function LoginTab({
             type="button"
             variant="ghost"
             size="sm"
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100"
+            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
             onClick={() => setShowRoleId(!showRoleId)}
           >
             {showRoleId ? (
-              <EyeOff className="h-4 w-4 text-gray-500" />
+              <EyeOff className="h-4 w-4" />
             ) : (
-              <Eye className="h-4 w-4 text-gray-500" />
+              <Eye className="h-4 w-4" />
             )}
           </Button>
         </div>
@@ -149,93 +150,22 @@ export function LoginTab({
         </div>
       </div>
 
-      {token && (
-        <div className="flex justify-end mb-2">
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                type="button"
-                onClick={() => {
-                  setGenResult(null);
-                }}
-              >
-                Generate Secret ID
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Generate Secret ID</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-2">
-                <Label htmlFor="gen-email">Recipient Email</Label>
-                <Input
-                  id="gen-email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={genLoading}
-                />
-                {genResult && (
-                  <div className={isGenerateError ? 'text-red-600 text-sm' : 'text-green-600 text-sm'}>{genResult}</div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={async () => {
-                    setGenLoading(true);
-                    setGenResult(null);
-                    try {
-                      const res = await fetch('/api/vault/auth/approle/generate-secret-id', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          ...(token ? { 'x-vault-token': token } : {})
-                        },
-                        body: JSON.stringify({ email, endpoint: credentials.endpoint })
-                      });
-                      if (res.ok) {
-                        setGenResult('Secret ID sent successfully.');
-                      } else {
-                        const data = await res.json();
-                        setGenResult('Failed to send: ' + (data.error || 'Unknown error'));
-                      }
-                    } catch (error: unknown) {
-                      const message = error instanceof Error ? error.message : 'Unknown error';
-                      setGenResult('Request failed: ' + message);
-                    } finally {
-                      setGenLoading(false);
-                    }
-                  }}
-                  disabled={genLoading || !email}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  {genLoading ? 'Sending...' : 'Send Secret ID'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-
       <div className="flex justify-between items-center pt-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {token ? (
-            <>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">Token Active</span>
-            </>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5">
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">Token Active</span>
+            </div>
           ) : (
-            <>
-              <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm text-red-500">No Token</span>
-            </>
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5">
+              <XCircle className="h-4 w-4 text-rose-500" />
+              <span className="text-sm font-medium text-rose-600">No Token</span>
+            </div>
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={onLogin}
             disabled={
@@ -244,7 +174,7 @@ export function LoginTab({
               !credentials.k8sSecretName ||
               !credentials.secretKey
             }
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="min-w-[92px] bg-slate-900 text-white hover:bg-slate-800"
           >
             {loading.login && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
             Login
@@ -253,17 +183,88 @@ export function LoginTab({
           <Button
             onClick={onLookup}
             disabled={loading.lookup || !token}
-            className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
             variant="outline"
+            className="min-w-[92px] border-slate-300 text-slate-700 hover:bg-slate-50"
           >
-            {loading.lookup && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
+            {loading.lookup && <div className="animate-spin w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full mr-2"></div>}
             Lookup
           </Button>
+
+          {token && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="min-w-[152px] border-slate-300 text-slate-700 hover:bg-slate-50"
+                  type="button"
+                  onClick={() => {
+                    setGenResult(null);
+                  }}
+                >
+                  Generate Secret ID
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Generate Secret ID</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <EmailRecipientsField
+                    id="gen-email"
+                    label="Recipient Emails"
+                    value={email}
+                    onChange={setEmail}
+                    disabled={genLoading}
+                  />
+                  {genResult && (
+                    <div className={`rounded-md border px-3 py-2 text-sm ${isGenerateError ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{genResult}</div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={async () => {
+                      setGenLoading(true);
+                      setGenResult(null);
+                      try {
+                        const res = await fetch('/api/vault/auth/approle/generate-secret-id', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'x-vault-token': token } : {})
+                          },
+                          body: JSON.stringify({
+                            email,
+                            endpoint: credentials.endpoint,
+                            roleId: credentials.accessId
+                          })
+                        });
+                        if (res.ok) {
+                          setGenResult('Secret ID sent successfully.');
+                        } else {
+                          const data = await res.json();
+                          setGenResult('Failed to send: ' + (data.error || 'Unknown error'));
+                        }
+                      } catch (error: unknown) {
+                        const message = error instanceof Error ? error.message : 'Unknown error';
+                        setGenResult('Request failed: ' + message);
+                      } finally {
+                        setGenLoading(false);
+                      }
+                    }}
+                    disabled={genLoading || !email}
+                    className="bg-slate-900 text-white hover:bg-slate-800"
+                  >
+                    {genLoading ? 'Sending...' : 'Send Secret ID'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
 
           <Button
             onClick={onLogout}
             disabled={loading.logout || !token}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="min-w-[92px] bg-rose-600 text-white hover:bg-rose-700"
             variant="destructive"
           >
             {loading.logout && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}

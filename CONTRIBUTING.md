@@ -8,7 +8,9 @@ This document provides information for developers who want to contribute to or w
 
 - Node.js (version 16 or higher)
 - npm or yarn
-- Docker (for containerized deployment)
+- Kubernetes cluster with `kubectl`
+- Helm 3
+- Python 3 (for the local SMTP debugging server)
 
 ### Getting Started
 
@@ -19,20 +21,75 @@ This document provides information for developers who want to contribute to or w
    npm install
    ```
 
-3. Create `.env.local` for development:
+3. Install a local Vault dev instance in Kubernetes:
 
-   ```env
-   VAULT_ENDPOINTS=http://localhost:8200,https://vault.example.com
-   APP_TITLE="Vault Secret Checker"
+   ```bash
+   helm repo add hashicorp https://helm.releases.hashicorp.com
+   helm repo update
+
+   helm install vault hashicorp/vault \
+     --set "server.dev.enabled=true" \
+     --set "server.dev.devRootToken=dev-only-token"
    ```
 
-4. Run the development server:
+4. Bootstrap Vault secrets, AppRole, and the Kubernetes secret used by the app:
+
+   ```bash
+   bash ci/scripts/setup-and-validate-vault.sh
+   ```
+
+5. Forward Vault to localhost:
+
+   ```bash
+   kubectl port-forward svc/vault 8200:8200
+   ```
+
+6. Start a local SMTP debugging server:
+
+   ```bash
+   python3 -m smtpd -c DebuggingServer -n localhost:1025
+   ```
+
+7. Create `.env.local` for development:
+
+   ```env
+   VAULT_ENDPOINTS=http://localhost:8200
+   APP_TITLE="Vault Secret Checker"
+   K8S_NAMESPACES=default
+   SMTP_HOST=localhost
+   SMTP_PORT=1025
+   SMTP_FROM_EMAIL=noreply@example.com
+   ```
+
+8. Run the development server:
 
    ```bash
    npm run dev
    ```
 
-5. Open `http://localhost:3000`
+9. Open `http://localhost:3000`
+
+### Local Development Values
+
+Inspect the generated Kubernetes secret:
+
+```bash
+kubectl get secret vault-credentials -o json | jq .data
+```
+
+Use these values in the UI:
+
+- `Role ID`: decode or copy the `role-id` value
+- `Namespace`: `default`
+- `Secret Name`: `vault-credentials`
+- `Key of Secret`: `secret-id`
+
+To decode the values locally:
+
+```bash
+kubectl get secret vault-credentials -o jsonpath='{.data.role-id}' | base64 --decode && echo
+kubectl get secret vault-credentials -o jsonpath='{.data.secret-id}' | base64 --decode && echo
+```
 
 ## Project Structure
 
@@ -138,12 +195,10 @@ For development, create a `.env.local` file with:
 ```env
 VAULT_ENDPOINTS=http://localhost:8200
 APP_TITLE="Vault Secret Checker"
-K8S_NAMESPACES=default,vault,kube-system
-EMAIL_HOST=smtp.example.com
-EMAIL_PORT=587
-EMAIL_USER=noreply@example.com
-EMAIL_PASS=password
-EMAIL_FROM=noreply@example.com
+K8S_NAMESPACES=default
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_FROM_EMAIL=noreply@example.com
 ```
 
 ## Troubleshooting
@@ -151,7 +206,10 @@ EMAIL_FROM=noreply@example.com
 ### Common Issues
 
 1. **Connection refused to Vault**: Ensure Vault is running and accessible
+   Check that `kubectl port-forward svc/vault 8200:8200` is still running
 2. **Permission denied**: Check AppRole permissions and policies
+   Re-run `bash ci/scripts/setup-and-validate-vault.sh` if the local Vault state was reset
+3. **Email not delivered**: Check that the local SMTP debug server is running on `localhost:1025`
 3. **Build failures**: Clear `node_modules` and reinstall dependencies
 
 ### Debug Mode

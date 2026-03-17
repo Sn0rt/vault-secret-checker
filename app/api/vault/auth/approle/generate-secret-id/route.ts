@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
-import { sendEmail } from '@/lib/email';
+import { parseEmailAddresses, sendEmail } from '@/lib/email';
 import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError, serverWarn } from '@/lib/server-logger';
 import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
@@ -8,6 +8,7 @@ import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
 interface GenerateSecretIdRequest {
   email?: string;
   endpoint?: string;
+  roleId?: string;
 }
 
 function resolveRoleName(payload: unknown): string | null {
@@ -50,12 +51,13 @@ export async function POST(req: NextRequest) {
   let resolvedRoleName: string | null = null;
 
   try {
-    const { email, endpoint }: GenerateSecretIdRequest = await req.json();
+    const { email, endpoint, roleId }: GenerateSecretIdRequest = await req.json();
     const vaultAddress = endpoint || process.env.VAULT_ADDR;
     const token = req.headers.get('x-vault-token');
+    const recipients = parseEmailAddresses(email || '');
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required.' }, { status: 400 });
+    if (recipients.length === 0) {
+      return NextResponse.json({ error: 'At least one valid recipient email is required.' }, { status: 400 });
     }
 
     if (!token) {
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const vaultUrl = normalizeVaultEndpoint(vaultAddress);
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
-    serverDebug('[generate-secret-id] Looking up AppRole metadata.', { lookupUrl, email });
+    serverDebug('[generate-secret-id] Looking up AppRole metadata.', { lookupUrl, recipientCount: recipients.length });
 
     const lookupResponse = await lookupVaultToken(vaultUrl, token);
 
@@ -95,24 +97,67 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    const secretId = secretIdResponse.data?.data?.secret_id;
+    const secretId =
+      secretIdResponse.data?.data?.secret_id ||
+      secretIdResponse.data?.secret_id ||
+      secretIdResponse.data?.data?.secretId ||
+      secretIdResponse.data?.secretId;
     if (!secretId) {
-      serverError('[generate-secret-id] Vault response did not include a secret ID.');
+      serverError('[generate-secret-id] Vault response did not include a secret ID.', {
+        roleName,
+        response: secretIdResponse.data
+      });
       return NextResponse.json({ error: 'Vault did not return a Secret ID.' }, { status: 502 });
     }
 
+    const generatedAt = new Date().toISOString();
+    const subject = `Vault Secret ID Generated for AppRole ${roleName}`;
+    const responseJson = JSON.stringify(secretIdResponse.data, null, 2);
+    const secretIdAccessor =
+      secretIdResponse.data?.data?.secret_id_accessor ||
+      secretIdResponse.data?.secret_id_accessor ||
+      secretIdResponse.data?.data?.secretIdAccessor ||
+      secretIdResponse.data?.secretIdAccessor ||
+      'Not provided';
+    const secretIdTtl =
+      secretIdResponse.data?.data?.secret_id_ttl ??
+      secretIdResponse.data?.secret_id_ttl ??
+      secretIdResponse.data?.data?.secretIdTtl ??
+      secretIdResponse.data?.secretIdTtl ??
+      'Not provided';
+    const secretIdNumUses =
+      secretIdResponse.data?.data?.secret_id_num_uses ??
+      secretIdResponse.data?.secret_id_num_uses ??
+      secretIdResponse.data?.data?.secretIdNumUses ??
+      secretIdResponse.data?.secretIdNumUses ??
+      'Not provided';
+    const text = `A new Vault Secret ID has been generated.
+
+AppRole: ${roleName}
+AppRole Role ID: ${roleId || 'Not provided'}
+Vault Endpoint: ${vaultUrl}
+Generated At: ${generatedAt}
+Secret ID Accessor: ${secretIdAccessor}
+Secret ID TTL: ${secretIdTtl}
+Secret ID Num Uses: ${secretIdNumUses}
+
+Raw Vault Response:
+${responseJson}
+
+Store it securely and rotate any previous references if needed.`;
+
     const emailSent = await sendEmail({
-      to: email,
-      subject: 'Your Vault Secret ID',
-      text: `Your Vault Secret ID: ${secretId}\nStore it securely.`,
+      to: recipients,
+      subject,
+      text,
     });
 
     if (!emailSent) {
-      serverError('[generate-secret-id] Secret ID created, but email delivery failed.', { email, roleName });
+      serverError('[generate-secret-id] Secret ID created, but email delivery failed.', { recipientCount: recipients.length, roleName });
       return NextResponse.json({ error: 'Secret ID created, but email delivery failed.' }, { status: 502 });
     }
 
-    serverDebug('[generate-secret-id] Secret ID generated and email sent.', { email, roleName });
+    serverDebug('[generate-secret-id] Secret ID generated and email sent.', { recipientCount: recipients.length, roleName });
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
