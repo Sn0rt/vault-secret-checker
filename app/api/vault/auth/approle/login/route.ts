@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError } from '@/lib/server-logger';
+import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 import * as k8s from '@kubernetes/client-node';
 
 export async function POST(request: NextRequest) {
@@ -155,7 +156,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    let vaultUrl: string;
+    try {
+      vaultUrl = requireAllowedVaultEndpoint(endpoint);
+    } catch {
+      serverDebug(`[LOGIN-${requestId}] Validation failed: Endpoint not allowed`, { endpoint });
+      return NextResponse.json(
+        { success: false, error: 'Vault endpoint is not allowed.' },
+        { status: 400 }
+      );
+    }
+
     const loginUrl = `${vaultUrl}/v1/auth/approle/login`;
 
     serverDebug(`[LOGIN-${requestId}] Making Vault login request to: ${loginUrl}`);

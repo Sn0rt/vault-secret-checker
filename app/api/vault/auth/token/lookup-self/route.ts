@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverDebug, serverError } from '@/lib/server-logger';
-import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
+import { lookupVaultToken } from '@/lib/vault-auth';
+import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -27,7 +28,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vaultUrl = normalizeVaultEndpoint(endpoint);
+    let vaultUrl: string;
+    try {
+      vaultUrl = requireAllowedVaultEndpoint(endpoint);
+    } catch {
+      serverDebug(`[LOOKUP-${requestId}] Validation failed: Endpoint not allowed`, { endpoint });
+      return NextResponse.json(
+        { success: false, error: 'Vault endpoint is not allowed.' },
+        { status: 400 }
+      );
+    }
+
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
 
     serverDebug(`[LOOKUP-${requestId}] Making Vault lookup request to: ${lookupUrl}`);

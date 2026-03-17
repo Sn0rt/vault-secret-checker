@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError } from '@/lib/server-logger';
+import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -28,7 +29,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    let vaultUrl: string;
+    try {
+      vaultUrl = requireAllowedVaultEndpoint(endpoint);
+    } catch {
+      serverDebug(`[VALIDATE-${requestId}] Validation failed: Endpoint not allowed`, { endpoint });
+      return NextResponse.json(
+        { success: false, error: 'Vault endpoint is not allowed.' },
+        { status: 400 }
+      );
+    }
 
     // Build the path for capabilities check - use secretPath directly
     const pathForCheck = secretPath.startsWith('/') ? secretPath.substring(1) : secretPath;

@@ -3,7 +3,8 @@ import axios from 'axios';
 import { parseEmailAddresses, sendEmail } from '@/lib/email';
 import { axiosInstance } from '@/lib/axios';
 import { serverDebug, serverError, serverWarn } from '@/lib/server-logger';
-import { lookupVaultToken, normalizeVaultEndpoint } from '@/lib/vault-auth';
+import { lookupVaultToken } from '@/lib/vault-auth';
+import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 interface GenerateSecretIdRequest {
   email?: string;
@@ -84,7 +85,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Vault endpoint is required.' }, { status: 400 });
     }
 
-    const vaultUrl = normalizeVaultEndpoint(vaultAddress);
+    let vaultUrl: string;
+    try {
+      vaultUrl = requireAllowedVaultEndpoint(vaultAddress);
+    } catch {
+      return NextResponse.json({ error: 'Vault endpoint is not allowed.' }, { status: 400 });
+    }
+
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
     serverDebug('[generate-secret-id] Looking up AppRole metadata.', { lookupUrl, recipientCount: recipients.length });
 

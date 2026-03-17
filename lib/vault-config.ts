@@ -13,6 +13,10 @@ export interface ConfigResponse {
   error?: string;
 }
 
+export function normalizeConfiguredVaultEndpoint(endpoint: string): string {
+  return endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+}
+
 export function getK8sNamespaces(): string[] {
   const defaultNamespaces = ["default"];
   
@@ -49,7 +53,7 @@ export function getVaultEndpoints(): string[] {
     try {
       const endpoints = vaultEndpoints
         .split(',')
-        .map(endpoint => endpoint.trim())
+        .map(endpoint => normalizeConfiguredVaultEndpoint(endpoint.trim()))
         .filter(endpoint => endpoint && endpoint.startsWith('http'));
 
       return endpoints.length > 0 ? endpoints : defaultEndpoints;
@@ -69,7 +73,7 @@ export function getVaultEndpoints(): string[] {
   try {
     const endpoints = vaultEndpoints
       .split(',')
-      .map(endpoint => endpoint.trim())
+      .map(endpoint => normalizeConfiguredVaultEndpoint(endpoint.trim()))
       .filter(endpoint => endpoint && endpoint.startsWith('http'));
 
     return endpoints.length > 0 ? endpoints : defaultEndpoints;
@@ -77,6 +81,25 @@ export function getVaultEndpoints(): string[] {
     console.warn('Error parsing NEXT_PUBLIC_VAULT_ENDPOINTS:', error);
     return defaultEndpoints;
   }
+}
+
+export function isAllowedVaultEndpoint(endpoint: string): boolean {
+  if (!endpoint) {
+    return false;
+  }
+
+  const normalizedEndpoint = normalizeConfiguredVaultEndpoint(endpoint.trim());
+  return getVaultEndpoints().includes(normalizedEndpoint);
+}
+
+export function requireAllowedVaultEndpoint(endpoint: string): string {
+  const normalizedEndpoint = normalizeConfiguredVaultEndpoint(endpoint.trim());
+
+  if (!isAllowedVaultEndpoint(normalizedEndpoint)) {
+    throw new Error('Vault endpoint is not allowed.');
+  }
+
+  return normalizedEndpoint;
 }
 
 export function getAppTitle(): string {
