@@ -120,6 +120,8 @@ kubectl get secret vault-credentials -o jsonpath='{.data.secret-id}' | base64 --
 The application provides API endpoints that proxy Vault operations:
 
 - `POST /api/vault/auth/approle/login`: AppRole authentication
+- `POST /api/vault/auth/approle/list-secret-id-accessors`: List Secret ID accessors for the current AppRole
+- `POST /api/vault/auth/approle/lookup-secret-id-accessor`: Look up metadata for a specific Secret ID accessor
 - `POST /api/vault/auth/token/lookup-self`: Token lookup
 - `POST /api/vault/auth/token/revoke-self`: Token revocation
 - `POST /api/vault/sys/capabilities-self`: Permission validation
@@ -213,6 +215,7 @@ SMTP_ADMIN_CC_WITH=
    Check that `kubectl port-forward svc/vault 8200:8200` is still running
 2. **Permission denied**: Check AppRole permissions and policies
    Re-run `bash ci/scripts/setup-and-validate-vault.sh` if the local Vault state was reset
+   Secret ID accessor metadata lookup also requires `update` on `auth/approle/role/<role-name>/secret-id-accessor/lookup`
 3. **Email not delivered**: Check that the local SMTP debug server is running on `localhost:1025`
 3. **Build failures**: Clear `node_modules` and reinstall dependencies
 
