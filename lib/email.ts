@@ -149,7 +149,7 @@ function isValidEmail(email: string): boolean {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
-    const adminBccRecipients = parseEmailAddresses(process.env.SMTP_ADMIN_BCC_WITH || '');
+    const adminCcRecipients = parseEmailAddresses(process.env.SMTP_ADMIN_CC_WITH || '');
 
     if (recipients.length === 0 || recipients.some((email) => !isValidEmail(email))) {
       serverError('Invalid email address format.', { recipients });
@@ -164,7 +164,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const mailOptions = {
       from: fromEmail,
       to: recipients,
-      bcc: adminBccRecipients.length > 0 ? adminBccRecipients : undefined,
+      cc: adminCcRecipients.length > 0 ? adminCcRecipients : undefined,
       subject: options.subject,
       text: options.text,
       html: options.html
@@ -172,7 +172,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     serverLog('Sending email.', {
       recipientCount: recipients.length,
-      adminBccCount: adminBccRecipients.length,
+      adminCcCount: adminCcRecipients.length,
       subject: options.subject,
       from: fromEmail
     });
@@ -189,7 +189,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         response: submission.response,
         envelope: submission.envelope,
         recipientCount: recipients.length,
-        adminBccCount: adminBccRecipients.length,
+        adminCcCount: adminCcRecipients.length,
         subject: options.subject,
         from: fromEmail,
       });
@@ -204,7 +204,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       response: submission.response,
       envelope: submission.envelope,
       recipientCount: recipients.length,
-      adminBccCount: adminBccRecipients.length,
+      adminCcCount: adminCcRecipients.length,
       subject: options.subject,
       from: fromEmail,
     });

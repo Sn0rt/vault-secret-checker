@@ -89,8 +89,8 @@ env:
   SMTP_SECURE: "false"
   # From email address for notifications
   SMTP_FROM_EMAIL: "noreply@example.com"
-  # Optional comma or space separated admin BCC recipients for all outgoing mail
-  SMTP_ADMIN_BCC_WITH: ""
+  # Optional comma or space separated admin CC recipients for all outgoing mail
+  SMTP_ADMIN_CC_WITH: ""
 
 # TLS Configuration
 tls:
