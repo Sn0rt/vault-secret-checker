@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog } from '@/lib/server-logger';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
 
-  serverDebug(`[REVOKE-${requestId}] Request started at ${new Date().toISOString()}`);
+  serverLog(`[REVOKE-${requestId}] Token revoke request started.`);
 
   try {
     const body = await request.json();
@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    serverDebug(`[REVOKE-${requestId}] Vault revoke successful, response status: ${response.status}`);
+    serverLog(`[REVOKE-${requestId}] Vault revoke successful.`, { status: response.status });
 
     const duration = Date.now() - startTime;
-    serverDebug(`[REVOKE-${requestId}] Request completed successfully in ${duration}ms`);
+    serverLog(`[REVOKE-${requestId}] Token revoke request completed successfully in ${duration}ms.`);
 
     return NextResponse.json(response.data);
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { serverDebug, serverError } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog } from '@/lib/server-logger';
 import { lookupVaultToken } from '@/lib/vault-auth';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
 
-  serverDebug(`[LOOKUP-${requestId}] Request started at ${new Date().toISOString()}`);
+  serverLog(`[LOOKUP-${requestId}] Token lookup request started.`);
 
   try {
     const body = await request.json();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     const result = await lookupVaultToken(vaultUrl, token);
 
-    serverDebug(`[LOOKUP-${requestId}] Vault lookup successful.`);
+    serverLog(`[LOOKUP-${requestId}] Vault lookup successful.`);
     serverDebug(`[LOOKUP-${requestId}] Token info:`, {
       id: result.data?.id ? `${result.data.id.substring(0, 8)}...` : undefined,
       ttl: result.data?.ttl,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     });
 
     const duration = Date.now() - startTime;
-    serverDebug(`[LOOKUP-${requestId}] Request completed successfully in ${duration}ms`);
+    serverLog(`[LOOKUP-${requestId}] Token lookup request completed successfully in ${duration}ms.`);
 
     return NextResponse.json(result);
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { parseEmailAddresses, sendEmail } from '@/lib/email';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError, serverWarn } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog, serverWarn } from '@/lib/server-logger';
 import { lookupVaultToken } from '@/lib/vault-auth';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
-    serverDebug('[generate-secret-id] Looking up AppRole metadata.', { lookupUrl, recipientCount: recipients.length });
+    serverLog('[generate-secret-id] Secret ID generation request started.', { lookupUrl, recipientCount: recipients.length });
 
     const lookupResponse = await lookupVaultToken(vaultUrl, token);
 
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     const { overridePath, configuredPath, secretIdUrl } = buildGenerateSecretIdUrl(vaultUrl, roleName);
     activeGenerateSecretIdPath = configuredPath;
     activeGenerateSecretIdUrl = secretIdUrl;
-    serverDebug('[generate-secret-id] Creating Secret ID.', {
+    serverLog('[generate-secret-id] Creating Secret ID.', {
       overridePath,
       configuredPath,
       usingOverride: !!overridePath,
@@ -188,7 +188,7 @@ Store it securely and rotate any previous references if needed.`;
       return NextResponse.json({ error: 'Secret ID created, but email delivery failed.' }, { status: 502 });
     }
 
-    serverDebug('[generate-secret-id] Secret ID generated and email sent.', { recipientCount: recipients.length, roleName });
+    serverLog('[generate-secret-id] Secret ID generated and email sent.', { recipientCount: recipients.length, roleName });
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {

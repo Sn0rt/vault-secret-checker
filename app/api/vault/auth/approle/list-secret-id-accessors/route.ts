@@ -1,7 +1,7 @@
 import { Method } from 'axios';
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError, serverWarn } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog, serverWarn } from '@/lib/server-logger';
 import { lookupVaultToken } from '@/lib/vault-auth';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
-    serverDebug('[list-secret-id-accessors] Looking up AppRole metadata.', { lookupUrl });
+    serverLog('[list-secret-id-accessors] Secret ID accessor listing request started.', { lookupUrl });
 
     const lookupResponse = await lookupVaultToken(vaultUrl, token);
     const roleName = resolveRoleName(lookupResponse);
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     requestStage = 'list-secret-id-accessors';
     const accessorsUrl = `${vaultUrl}/v1/auth/approle/role/${encodeURIComponent(roleName)}/secret-id`;
-    serverDebug('[list-secret-id-accessors] Listing Secret ID accessors.', { accessorsUrl, roleName });
+    serverLog('[list-secret-id-accessors] Listing Secret ID accessors.', { accessorsUrl, roleName });
 
     const response = await axiosInstance.request({
       url: accessorsUrl,
@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
     });
 
     const accessors = Array.isArray(response.data?.data?.keys) ? response.data.data.keys : [];
+    serverLog('[list-secret-id-accessors] Secret ID accessor listing completed.', { roleName, accessorCount: accessors.length });
     return NextResponse.json({
       success: true,
       roleName,

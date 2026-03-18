@@ -218,4 +218,4 @@ SMTP_ADMIN_CC_WITH=
 
 ### Debug Mode
 
-Set `NODE_ENV=development` for additional logging.
+Set `LOG_LEVEL=debug` for additional logging.

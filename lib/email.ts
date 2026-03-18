@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { serverDebug, serverError } from './server-logger';
+import { serverDebug, serverError, serverLog, serverWarn } from './server-logger';
 
 interface EmailOptions {
   to: string | string[];
@@ -126,7 +126,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       html: options.html
     };
 
-    serverDebug('Sending email:', {
+    serverLog('Sending email.', {
       recipientCount: recipients.length,
       adminCcCount: adminCcRecipients.length,
       subject: options.subject,
@@ -135,7 +135,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     const result = await transporter.sendMail(mailOptions);
 
-    serverDebug('Email sent successfully:', {
+    serverLog('Email sent successfully.', {
       messageId: result.messageId,
       recipientCount: recipients.length,
       adminCcCount: adminCcRecipients.length
@@ -165,7 +165,7 @@ export async function sendUnwrapNotification(
 
   // Check if SMTP is configured
   if (!isSmtpConfigured()) {
-    serverDebug('SMTP not configured, skipping email notification');
+    serverWarn('SMTP not configured, skipping email notification.');
     result.details.push('SMTP not configured');
     return result;
   }
@@ -174,12 +174,13 @@ export async function sendUnwrapNotification(
   const emails = parseEmailAddresses(emailString);
 
   if (emails.length === 0) {
-    serverDebug('No valid email addresses found');
+    serverWarn('No valid email addresses found for email notification.');
     result.details.push('No valid email addresses found');
     return result;
   }
 
-  serverDebug(`Sending unwrap notification to ${emails.length} recipients:`, emails);
+  serverLog(`Sending unwrap notification to ${emails.length} recipients.`);
+  serverDebug('Unwrap notification recipients:', emails);
 
   const subject = `Token Unwrap Notification - ${data.success ? 'Success' : 'Failed'}`;
 
@@ -222,7 +223,7 @@ This notification was generated automatically by the ${appTitle} system.`;
     serverError('Failed to send unwrap notification email.', error);
   }
 
-  serverDebug('Email notification results:', result);
+  serverLog('Email notification completed.', result);
   return result;
 }
 
@@ -250,7 +251,7 @@ export async function ensureSmtpReady(): Promise<void> {
   if (!globalThis.__smtpVerificationPromise) {
     globalThis.__smtpVerificationPromise = (async () => {
       await verifySmtpConnection();
-      serverDebug('SMTP connection verified successfully');
+      serverLog('SMTP connection verified successfully.');
     })();
   }
 

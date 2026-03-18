@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog, serverWarn } from '@/lib/server-logger';
 import { sendUnwrapNotification } from '@/lib/email';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
 
-  serverDebug(`[UNWRAP-${requestId}] Request started at ${new Date().toISOString()}`);
+  serverLog(`[UNWRAP-${requestId}] Unwrap request started.`);
 
   let notificationEmail = ''; // Store this at the top level for error handling
 
@@ -64,13 +64,14 @@ export async function POST(request: NextRequest) {
       headers
     });
 
-    serverDebug(`[UNWRAP-${requestId}] Vault unwrap successful, response status: ${response.status}`);
+    serverLog(`[UNWRAP-${requestId}] Vault unwrap successful.`, { status: response.status });
 
     const duration = Date.now() - startTime;
-    serverDebug(`[UNWRAP-${requestId}] Request completed successfully in ${duration}ms`);
+    serverLog(`[UNWRAP-${requestId}] Unwrap request completed successfully in ${duration}ms.`);
 
     // Send notification email if provided
     if (notificationEmail) {
+      serverLog(`[UNWRAP-${requestId}] Scheduling notification email delivery.`);
       serverDebug(`[UNWRAP-${requestId}] Sending notification email to: ${notificationEmail}`);
       
       // Send notification asynchronously (don't block the response)
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
                   'unknown',
         response: response.data // Include the actual response data
       }).catch(error => {
-        serverError(`[UNWRAP-${requestId}] Failed to send notification email:`, error);
+        serverWarn(`[UNWRAP-${requestId}] Notification email delivery failed.`, error);
       });
     }
 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
             statusText: axiosError.response.statusText
           }
         }).catch(emailError => {
-          serverError(`[UNWRAP-${requestId}] Failed to send failure notification email:`, emailError);
+          serverWarn(`[UNWRAP-${requestId}] Failure notification email delivery failed.`, emailError);
         });
       }
 
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
           type: 'network_error'
         }
       }).catch(emailError => {
-        serverError(`[UNWRAP-${requestId}] Failed to send failure notification email:`, emailError);
+        serverWarn(`[UNWRAP-${requestId}] Failure notification email delivery failed.`, emailError);
       });
     }
 

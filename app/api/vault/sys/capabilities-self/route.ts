@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog } from '@/lib/server-logger';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
 
-  serverDebug(`[VALIDATE-${requestId}] Request started at ${new Date().toISOString()}`);
+  serverLog(`[VALIDATE-${requestId}] Permission validation request started.`);
 
   try {
     const body = await request.json();
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const capabilitiesUrl = `${vaultUrl}/v1/sys/capabilities-self`;
 
-    serverDebug(`[VALIDATE-${requestId}] Making Vault capabilities request to: ${capabilitiesUrl}`);
+    serverLog(`[VALIDATE-${requestId}] Checking Vault capabilities.`, { capabilitiesUrl });
     serverDebug(`[VALIDATE-${requestId}] Request payload:`, { path: pathForCheck });
 
     const response = await axiosInstance.post(capabilitiesUrl, {
@@ -59,10 +59,10 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    serverDebug(`[VALIDATE-${requestId}] Vault capabilities request successful, response status: ${response.status}`);
+    serverLog(`[VALIDATE-${requestId}] Vault capabilities request successful.`, { status: response.status });
 
     const duration = Date.now() - startTime;
-    serverDebug(`[VALIDATE-${requestId}] Request completed successfully in ${duration}ms`);
+    serverLog(`[VALIDATE-${requestId}] Permission validation request completed successfully in ${duration}ms.`);
 
     return NextResponse.json(response.data);
 

@@ -35,10 +35,10 @@ const formatter = winston.format.printf(({ level, message, timestamp, stack, ...
   return `${timestamp} [${level.toUpperCase()}] ${resolvedMessage}${serializeMeta(meta)}${stackSuffix}`;
 });
 
+const resolvedLogLevel = process.env.LOG_LEVEL?.toLowerCase() || 'info';
+
 const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production'
-    ? (process.env.LOG_LEVEL || 'warn')
-    : (process.env.DEBUG === 'true' ? 'debug' : (process.env.LOG_LEVEL || 'info')),
+  level: resolvedLogLevel,
   format: winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),

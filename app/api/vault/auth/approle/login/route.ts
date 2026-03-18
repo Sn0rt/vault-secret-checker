@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
-import { serverDebug, serverError } from '@/lib/server-logger';
+import { serverDebug, serverError, serverLog } from '@/lib/server-logger';
 import { requireAllowedVaultEndpoint } from '@/lib/vault-config';
 import * as k8s from '@kubernetes/client-node';
 
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
   
-  serverDebug(`[LOGIN-${requestId}] Request started at ${new Date().toISOString()}`);
+  serverLog(`[LOGIN-${requestId}] Login request started.`);
   
   try {
     const body = await request.json();
@@ -183,11 +183,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    serverDebug(`[LOGIN-${requestId}] Vault login successful, response status: ${response.status}`);
+    serverLog(`[LOGIN-${requestId}] Vault login successful.`, { status: response.status });
     serverDebug(`[LOGIN-${requestId}] Token received: ${!!response.data.auth?.client_token}, renewable: ${response.data.auth?.renewable}`);
 
     const duration = Date.now() - startTime;
-    serverDebug(`[LOGIN-${requestId}] Request completed successfully in ${duration}ms`);
+    serverLog(`[LOGIN-${requestId}] Login request completed successfully in ${duration}ms.`);
 
     return NextResponse.json(response.data);
 
