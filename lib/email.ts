@@ -23,6 +23,15 @@ interface EmailSendResult {
   details: string[];
 }
 
+interface SmtpSubmissionSummary {
+  messageId?: string;
+  accepted: string[];
+  rejected: string[];
+  pending: string[];
+  response?: string;
+  envelope?: unknown;
+}
+
 declare global {
   var __smtpVerificationPromise: Promise<void> | undefined;
 }
@@ -41,6 +50,41 @@ function getErrorMessage(error: unknown): string {
     return String(error.message);
   }
   return 'Unknown error';
+}
+
+function getErrorResponse(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'response' in error) {
+    return String(error.response);
+  }
+  return undefined;
+}
+
+function getErrorCommand(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'command' in error) {
+    return String(error.command);
+  }
+  return undefined;
+}
+
+function normalizeRecipientList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item))
+    .filter(Boolean);
+}
+
+function summarizeSmtpSubmission(result: nodemailer.SentMessageInfo): SmtpSubmissionSummary {
+  return {
+    messageId: typeof result.messageId === 'string' ? result.messageId : undefined,
+    accepted: normalizeRecipientList(result.accepted),
+    rejected: normalizeRecipientList(result.rejected),
+    pending: normalizeRecipientList('pending' in result ? result.pending : []),
+    response: typeof result.response === 'string' ? result.response : undefined,
+    envelope: result.envelope,
+  };
 }
 
 // Check if SMTP is configured
@@ -105,7 +149,7 @@ function isValidEmail(email: string): boolean {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
-    const adminCcRecipients = parseEmailAddresses(process.env.SMTP_ADMIN_CC_WITH || '');
+    const adminBccRecipients = parseEmailAddresses(process.env.SMTP_ADMIN_BCC_WITH || '');
 
     if (recipients.length === 0 || recipients.some((email) => !isValidEmail(email))) {
       serverError('Invalid email address format.', { recipients });
@@ -120,7 +164,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const mailOptions = {
       from: fromEmail,
       to: recipients,
-      cc: adminCcRecipients.length > 0 ? adminCcRecipients : undefined,
+      bcc: adminBccRecipients.length > 0 ? adminBccRecipients : undefined,
       subject: options.subject,
       text: options.text,
       html: options.html
@@ -128,25 +172,52 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     serverLog('Sending email.', {
       recipientCount: recipients.length,
-      adminCcCount: adminCcRecipients.length,
+      adminBccCount: adminBccRecipients.length,
       subject: options.subject,
       from: fromEmail
     });
 
     const result = await transporter.sendMail(mailOptions);
+    const submission = summarizeSmtpSubmission(result);
 
-    serverLog('Email sent successfully.', {
-      messageId: result.messageId,
+    if (submission.accepted.length === 0 || submission.rejected.length > 0) {
+      serverError('SMTP did not accept email for delivery.', {
+        messageId: submission.messageId,
+        accepted: submission.accepted,
+        rejected: submission.rejected,
+        pending: submission.pending,
+        response: submission.response,
+        envelope: submission.envelope,
+        recipientCount: recipients.length,
+        adminBccCount: adminBccRecipients.length,
+        subject: options.subject,
+        from: fromEmail,
+      });
+      return false;
+    }
+
+    serverLog('SMTP accepted email for delivery.', {
+      messageId: submission.messageId,
+      accepted: submission.accepted,
+      rejected: submission.rejected,
+      pending: submission.pending,
+      response: submission.response,
+      envelope: submission.envelope,
       recipientCount: recipients.length,
-      adminCcCount: adminCcRecipients.length
+      adminBccCount: adminBccRecipients.length,
+      subject: options.subject,
+      from: fromEmail,
     });
 
     return true;
   } catch (error) {
-    serverError('Failed to send email:', {
+    serverError('SMTP submission failed.', {
       recipientCount: Array.isArray(options.to) ? options.to.length : 1,
       subject: options.subject,
-      error: getErrorCode(error)
+      errorCode: getErrorCode(error),
+      errorMessage: getErrorMessage(error),
+      response: getErrorResponse(error),
+      command: getErrorCommand(error),
     });
     return false;
   }
@@ -212,10 +283,10 @@ This notification was generated automatically by the ${appTitle} system.`;
 
     if (success) {
       result.success = emails.length;
-      result.details.push(`Successfully sent one email to ${emails.length} recipients`);
+      result.details.push(`SMTP accepted one email for ${emails.length} recipients`);
     } else {
       result.failed = emails.length;
-      result.details.push(`Failed to send email to ${emails.length} recipients`);
+      result.details.push(`SMTP did not accept email for ${emails.length} recipients`);
     }
   } catch (error) {
     result.failed = emails.length;
@@ -232,7 +303,7 @@ export async function testEmailConfiguration(): Promise<boolean> {
   try {
     serverDebug('Testing email configuration...');
     await verifySmtpConnection();
-    serverDebug('SMTP configuration is valid');
+    serverLog('SMTP connection verified successfully.');
     return true;
   } catch (error) {
     serverError('SMTP configuration test failed:', {

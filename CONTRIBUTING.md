@@ -60,7 +60,7 @@ This document provides information for developers who want to contribute to or w
    SMTP_HOST=localhost
    SMTP_PORT=1025
    SMTP_FROM_EMAIL=noreply@example.com
-   SMTP_ADMIN_CC_WITH=
+   SMTP_ADMIN_BCC_WITH=
    ```
 
 8. Run the development server:
@@ -204,7 +204,7 @@ VAULT_V1_GENERATE_SECRET_ID=
 SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_FROM_EMAIL=noreply@example.com
-SMTP_ADMIN_CC_WITH=
+SMTP_ADMIN_BCC_WITH=
 ```
 
 ## Troubleshooting
