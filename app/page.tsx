@@ -33,18 +33,19 @@ interface UnwrapCredentials {
 
 // Custom hook for localStorage persistence
 function useLocalStorage(key: string, initialValue: string) {
-  const [storedValue, setStoredValue] = useState<string>(initialValue);
+  const [storedValue, setStoredValue] = useState<string>(() => {
+    if (typeof window === 'undefined') {
+      return initialValue;
+    }
 
-  useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
-      if (item) {
-        setStoredValue(item);
-      }
+      return item ?? initialValue;
     } catch (error) {
       console.warn(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
     }
-  }, [key]);
+  });
 
   const setValue = (value: string) => {
     try {
@@ -84,7 +85,6 @@ export default function Home() {
   const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
   const [availableNamespaces, setAvailableNamespaces] = useState<string[]>(['default']);
   const [emailConfigured, setEmailConfigured] = useState<boolean>(false);
-  const [endpoint, setEndpoint] = useState<string>('');
 
   // Use localStorage for non-sensitive fields
   const [storedEndpoint, setStoredEndpoint] = useLocalStorage('vault-endpoint', defaultEndpoint);
@@ -93,22 +93,19 @@ export default function Home() {
   const [storedK8sNamespace, setStoredK8sNamespace] = useLocalStorage('vault-k8sNamespace', '');
   const [storedK8sSecretName, setStoredK8sSecretName] = useLocalStorage('vault-k8sSecretName', '');
   const [storedSecretKey, setStoredSecretKey] = useLocalStorage('vault-secretKey', 'secret-id');
+  const [endpoint, setEndpoint] = useState<string>(() =>
+    getAllowedEndpoint(storedEndpoint || defaultEndpoint, vaultEndpoints)
+  );
 
-  const [credentials, setCredentials] = useState<VaultCredentials>({
-    endpoint: storedEndpoint || defaultEndpoint,
+  const credentials: VaultCredentials = {
+    endpoint: getAllowedEndpoint(endpoint || storedEndpoint || defaultEndpoint, availableEndpoints),
     accessId: storedAccessId,
     secretPath: storedSecretPath,
     authMethod: 'approle',
     k8sNamespace: storedK8sNamespace,
     k8sSecretName: storedK8sSecretName,
     secretKey: storedSecretKey
-  });
-
-  // Initialize endpoint state
-  useEffect(() => {
-    const nextEndpoint = getAllowedEndpoint(storedEndpoint || defaultEndpoint, availableEndpoints);
-    setEndpoint(nextEndpoint);
-  }, [storedEndpoint, defaultEndpoint, availableEndpoints]);
+  };
 
   const [loading, setLoading] = useState<{
     login?: boolean;
@@ -141,6 +138,15 @@ export default function Home() {
         setAvailableEndpoints(normalizedEndpoints);
         setAvailableNamespaces(response.data.config.namespaces);
         setEmailConfigured(response.data.config.email?.configured || false);
+
+        const persistedEndpoint = typeof window !== 'undefined'
+          ? window.localStorage.getItem('vault-endpoint') || defaultEndpoint
+          : defaultEndpoint;
+        const nextEndpoint = getAllowedEndpoint(persistedEndpoint, normalizedEndpoints);
+        setEndpoint(nextEndpoint);
+        if (nextEndpoint !== persistedEndpoint) {
+          setStoredEndpoint(nextEndpoint);
+        }
       } catch (error) {
         console.warn('Failed to load config from server, using defaults:', error);
       }
@@ -151,31 +157,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  useEffect(() => {
-    const nextEndpoint = getAllowedEndpoint(storedEndpoint || endpoint || defaultEndpoint, availableEndpoints);
-    if (nextEndpoint !== endpoint) {
-      setEndpoint(nextEndpoint);
-    }
-    if (nextEndpoint !== storedEndpoint) {
-      setStoredEndpoint(nextEndpoint);
-    }
-  }, [availableEndpoints, defaultEndpoint, endpoint, setStoredEndpoint, storedEndpoint]);
-
-  // Sync credentials with localStorage values when they change
-  useEffect(() => {
-    setCredentials(prev => ({
-      ...prev,
-      endpoint: endpoint,
-      accessId: storedAccessId,
-      secretPath: storedSecretPath,
-      authMethod: 'approle',
-      k8sNamespace: storedK8sNamespace,
-      k8sSecretName: storedK8sSecretName,
-      secretKey: storedSecretKey
-    }));
-  }, [endpoint, storedAccessId, storedSecretPath, storedK8sNamespace, storedK8sSecretName, storedSecretKey]);
+  }, [defaultEndpoint, setStoredEndpoint]);
 
   const handleEndpointChange = (value: string) => {
     const nextEndpoint = getAllowedEndpoint(value, availableEndpoints);
@@ -215,15 +197,10 @@ export default function Home() {
   };
 
   const handleInputChange = (field: keyof VaultCredentials, value: string) => {
-    setCredentials(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
     // Persist non-sensitive fields to localStorage
     switch (field) {
       case 'endpoint':
-        setStoredEndpoint(value);
+        handleEndpointChange(value);
         break;
       case 'accessId':
         setStoredAccessId(value);
@@ -251,7 +228,7 @@ export default function Home() {
   };
 
   const testUnwrap = async () => {
-    if (!endpoint || !unwrapCredentials.wrappedToken) {
+    if (!credentials.endpoint || !unwrapCredentials.wrappedToken) {
       toast.error('Please fill in endpoint and wrapped token');
       return;
     }
@@ -259,7 +236,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, unwrap: true }));
     try {
       const response = await axios.post('/api/vault/sys/wrapping/unwrap', {
-        endpoint: endpoint,
+        endpoint: credentials.endpoint,
         wrappedToken: unwrapCredentials.wrappedToken,
         notificationEmail: unwrapCredentials.notificationEmail
       });
@@ -278,7 +255,7 @@ export default function Home() {
   };
 
   const testLogin = async () => {
-    if (!endpoint || !credentials.accessId) {
+    if (!credentials.endpoint || !credentials.accessId) {
       toast.error('Please fill in endpoint and access ID');
       return;
     }
@@ -292,7 +269,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, login: true }));
     try {
       const response = await axios.post('/api/vault/auth/approle/login', {
-        endpoint: endpoint,
+        endpoint: credentials.endpoint,
         accessId: credentials.accessId,
         authMethod: credentials.authMethod,
         k8sNamespace: credentials.k8sNamespace,
@@ -321,7 +298,7 @@ export default function Home() {
   };
 
   const testLookup = async () => {
-    if (!endpoint || !token) {
+    if (!credentials.endpoint || !token) {
       toast.error('Please login first to get a token');
       return;
     }
@@ -329,7 +306,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, lookup: true }));
     try {
       const response = await axios.post('/api/vault/auth/token/lookup-self', {
-        endpoint: endpoint,
+        endpoint: credentials.endpoint,
         token: token
       });
 
@@ -352,7 +329,7 @@ export default function Home() {
   };
 
   const testLogout = async () => {
-    if (!endpoint || !token) {
+    if (!credentials.endpoint || !token) {
       toast.error('No token to revoke');
       return;
     }
@@ -360,7 +337,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, logout: true }));
     try {
       await axios.post('/api/vault/auth/token/revoke-self', {
-        endpoint: endpoint,
+        endpoint: credentials.endpoint,
         token: token
       });
 
@@ -380,7 +357,7 @@ export default function Home() {
   };
 
   const testValidateAccess = async () => {
-    if (!endpoint || !token || !credentials.secretPath) {
+    if (!credentials.endpoint || !token || !credentials.secretPath) {
       toast.error('Please login first and fill in secret path');
       return;
     }
@@ -388,7 +365,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, validateAccess: true }));
     try {
       const response = await axios.post('/api/vault/sys/capabilities-self', {
-        endpoint: endpoint,
+        endpoint: credentials.endpoint,
         token: token,
         secretPath: credentials.secretPath
       });
@@ -425,7 +402,7 @@ export default function Home() {
               {/* Step 1: Vault Endpoint */}
               <EndpointList
                 availableEndpoints={availableEndpoints}
-                currentEndpoint={endpoint}
+                currentEndpoint={credentials.endpoint}
                 onEndpointChange={handleEndpointChange}
                 emailConfigured={emailConfigured}
               />

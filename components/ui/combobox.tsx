@@ -39,26 +39,23 @@ export function Combobox({
   className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState(value || "")
-
-  React.useEffect(() => {
-    setInputValue(value || "")
-  }, [value])
+  const [searchValue, setSearchValue] = React.useState("")
 
   const handleSelect = (selectedValue: string) => {
     onValueChange(selectedValue)
-    setInputValue(selectedValue)
+    setSearchValue("")
     setOpen(false)
   }
 
   const handleInputChange = (newValue: string) => {
-    setInputValue(newValue)
+    setSearchValue(newValue)
     if (allowCustom) {
       onValueChange(newValue)
     }
   }
 
-  const displayValue = inputValue || placeholder
+  const inputValue = allowCustom ? (value || searchValue) : searchValue
+  const displayValue = value || placeholder
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
