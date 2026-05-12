@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import JsonView from '@uiw/react-json-view';
@@ -47,7 +47,7 @@ function useLocalStorage(key: string, initialValue: string) {
     }
   });
 
-  const setValue = (value: string) => {
+  const setValue = useCallback((value: string) => {
     try {
       setStoredValue(value);
       if (typeof window !== 'undefined') {
@@ -56,7 +56,7 @@ function useLocalStorage(key: string, initialValue: string) {
     } catch (error) {
       console.warn(`Error setting localStorage key "${key}":`, error);
     }
-  };
+  }, [key]);
 
   return [storedValue, setValue] as const;
 }
@@ -75,11 +75,11 @@ function getAllowedEndpoint(
 
 export default function Home() {
   // Get default title (will be overridden by config API)
-  const defaultAppTitle = getAppTitle();
+  const defaultAppTitle = useMemo(() => getAppTitle(), []);
   const [appTitle, setAppTitle] = useState<string>(defaultAppTitle);
 
   // Get endpoints from environment variable
-  const vaultEndpoints = getVaultEndpoints();
+  const vaultEndpoints = useMemo(() => getVaultEndpoints(), []);
   const defaultEndpoint = vaultEndpoints[0] || '';
 
   const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
